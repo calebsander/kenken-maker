@@ -1,0 +1,151 @@
+import {Box, Cage, Op, OPS} from './types'
+import {rand, transpose} from './utils'
+
+const SHUFFLE_TIMES = 1e5 //number of times to shuffle rows and columns when making random board
+const MIN_CAGE_PROP = 0.3, MAX_CAGE_PROP = 0.45 //number of cages / number of cells
+const MIN_CAGE_SIZE = 1, MAX_CAGE_SIZE_PROP = 1.5 //MEAN_CAGE_SIZE_PROP = 0.7
+
+type Board = number[][] //indexed by row, then col
+
+export function makeBoard(max: number, shuffleTimes = SHUFFLE_TIMES): Board {
+	/*Strategy: start with a known board
+	  (first row is [1, ..., max] and each subsequent row is shifted over once more)
+	  e.g. 1 2 3
+	       2 3 1
+	       3 1 2
+	*/
+	let board: Board = []
+	for (let row = 0; row < max; row++) {
+		const cells: typeof board[0] = []
+		for (let col = 0; col < max; col++) cells[col] = (row + col) % max + 1
+		board[row] = cells
+	}
+	//Then alternately swap rows and columns
+	for (let _ = 0; _ < shuffleTimes; _++) {
+		const r1 = rand(max), r2 = rand(max)
+		const temp = board[r1]
+		board[r1] = board[r2]
+		board[r2] = temp
+		board = transpose(board) //what were columns become rows and get swapped next time
+	}
+	return board
+}
+
+// const poisson = (mu: number) => { //picks a random number according to a Poisson(mu) distribution
+// 	const cumProb = Math.random() * Math.exp(mu)
+// 	let prob = 0
+// 	let mu_k = 1
+// 	let kFac = 1
+// 	for (let k = 0; ; k++) {
+// 		prob += mu_k / kFac
+// 		if (prob > cumProb) return k
+// 		mu_k *= mu
+// 		kFac *= k + 1
+// 	}
+// }
+const makeCageCount = (max: number) =>
+	Math.round(
+		(Math.random() * (MAX_CAGE_PROP - MIN_CAGE_PROP) + MIN_CAGE_PROP) *
+		max ** 2
+	)
+const maxCageSize = (max: number) => MAX_CAGE_SIZE_PROP * Math.sqrt(max)
+const makeCageSize = (max: number) =>
+	MIN_CAGE_SIZE + Math.round(Math.random() * (maxCageSize(max) - MIN_CAGE_SIZE))
+type BoxId = string
+const boxId = (box: Box): BoxId => box.join(' ')
+const fromBoxId = (id: BoxId): Box => id.split(' ').map(Number) as Box
+const chooseRand = <T>(arr: T[]) => arr[rand(arr.length)]
+const extractRand = <T>(arr: T[]) => arr.splice(rand(arr.length), 1)[0]
+const DIRS: Box[] = [[1, 0], [-1, 0], [0, 1], [0, -1]]
+const numericOps = OPS.filter(op => op !== '=')
+const opsWithoutMinus = numericOps.filter(op => op !== '-')
+function insertIntoSorted<T>(arr: T[], item: T, comp: (a: T, b: T) => number) {
+	const {length} = arr
+	let i
+	for (i = 0; i < length && comp(item, arr[i]) > 0; i++); //while item > arr[i]
+	arr.splice(i, 0, item)
+}
+
+export function makeCages(board: Board): Cage[] {
+	const max = board.length
+	const cageCount = makeCageCount(max)
+	const cagedCells = new Set<BoxId>()
+	const neighborsOf = ([row, col]: Box) =>
+		DIRS
+			.map(([dr, dc]) => [row + dr, col + dc] as Box)
+			.filter(neighbor => neighbor.every(x => 0 <= x && x < max) && !cagedCells.has(boxId(neighbor)))
+	const fullGrid: Box[] = []
+	for (let row = 0; row < max; row++) {
+		for (let col = 0; col < max; col++) fullGrid.push([row, col])
+	}
+	const unallocatedRegions: Box[][] = [fullGrid] //sorted by size
+	const cages: Cage[] = []
+	function addCage(cage: Box[]) {
+		let op: Op, val: number
+		if (cage.length === 1) {
+			op = '='
+			const [[row, col]] = cage
+			val = board[row][col]
+		}
+		else {
+			const numbers = cage.map(([row, col]) => board[row][col])
+			const max = Math.max(...numbers)
+			const maxMinus = max - (numbers.reduce((a, b) => a + b) - max)
+			op = chooseRand(maxMinus > 0 ? numericOps : opsWithoutMinus)
+			switch (op) {
+				case '+':
+					val = numbers.reduce((a, b) => a + b)
+					break
+				case '*':
+					val = numbers.reduce((a, b) => a * b)
+					break
+				case '-':
+					val = maxMinus
+			}
+		}
+		cages.push({
+			op,
+			val: val!,
+			boxes: cage
+		})
+	}
+	const maxCage = maxCageSize(max)
+	while (unallocatedRegions.length && (unallocatedRegions.length + cages.length < cageCount || unallocatedRegions.slice(-1)[0].length > maxCage)) {
+		const region = unallocatedRegions.pop()! //region from which to carve out a cage
+		const regionRemaining = new Set(region.map(boxId))
+		const cageSize = makeCageSize(max)
+		const cageStart = chooseRand(region)
+		const cage: Box[] = []
+		function addToCage(box: Box) {
+			cage.push(box)
+			cagedCells.add(boxId(box))
+			regionRemaining.delete(boxId(box))
+		}
+		addToCage(cageStart)
+		const neighbors: Box[] = neighborsOf(cageStart)
+		while (cage.length < cageSize && neighbors.length) {
+			const neighbor = extractRand(neighbors)
+			if (!regionRemaining.has(boxId(neighbor))) continue
+			addToCage(neighbor)
+			neighbors.push(...neighborsOf(neighbor))
+		}
+		addCage(cage)
+		while (regionRemaining.size) {
+			const [subRegionStart] = regionRemaining
+			regionRemaining.delete(subRegionStart)
+			const unallocatedRegion = [fromBoxId(subRegionStart)]
+			const neighbors = neighborsOf(fromBoxId(subRegionStart))
+			while (neighbors.length) {
+				const nextNeighbor = neighbors.pop()!
+				const nextId = boxId(nextNeighbor)
+				if (!regionRemaining.has(nextId)) continue
+				regionRemaining.delete(nextId)
+				unallocatedRegion.push(nextNeighbor)
+				neighbors.push(...neighborsOf(nextNeighbor))
+			}
+			insertIntoSorted(unallocatedRegions, unallocatedRegion, (region1, region2) => region1.length - region2.length)
+		}
+	}
+	unallocatedRegions.forEach(addCage)
+	return cages
+}

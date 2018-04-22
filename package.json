@@ -1,0 +1,17 @@
+{
+	"name": "kenken-maker",
+	"version": "1.0.0",
+	"description": "Generates KenKen® puzzles",
+	"main": "main.js",
+	"scripts": {
+		"build": "tsc",
+		"test": "echo \"Error: no test specified\" && exit 1"
+	},
+	"author": "Caleb Sander",
+	"license": "MIT",
+	"dependencies": {
+		"@types/node": "^9.6.1",
+		"structure-bytes": "^17.1.0",
+		"typescript": "^2.8.1"
+	}
+}

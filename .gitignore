@@ -1,5 +1,5 @@
 node_modules
 *.js
-puzzle*.html
+puzzle.html
 cagings
 solution.sbv

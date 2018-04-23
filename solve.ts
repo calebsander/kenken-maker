@@ -109,16 +109,15 @@ const pickUniques: Solver = board => {
 	}
 }
 const findIsolatedGroups: Solver = board => {
-	for (const row of board.rows) {
-		const unknownBoxes = row.boxes.filter(box => box.value === undefined)
-		for (let groupSize = 1; groupSize <= MAX_GROUP_SIZE && groupSize < unknownBoxes.length; groupSize++) {
-			for (const rowPermutation of permute(unknownBoxes, groupSize)) {
+	for (const {boxes} of board.rows) {
+		for (let groupSize = 1; groupSize <= MAX_GROUP_SIZE && groupSize < boxes.length; groupSize++) {
+			for (const rowPermutation of permute(boxes, groupSize)) {
 				const possibilitiesUnion = new Set<number>()
 				for (let i = 0; i < groupSize; i++) { //union all possibilities of first groupSize cells
 					for (const possibility of rowPermutation[i].possibilities) possibilitiesUnion.add(possibility)
 				}
 				if (possibilitiesUnion.size > groupSize) continue //not an isolated group
-				for (let i = groupSize; i < unknownBoxes.length; i++) { //remove possibilites from other cells
+				for (let i = groupSize; i < boxes.length; i++) { //remove possibilites from other cells
 					for (const possibility of possibilitiesUnion) rowPermutation[i].excludePossibility(possibility)
 				}
 			}

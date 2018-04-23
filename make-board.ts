@@ -2,8 +2,8 @@ import {Box, Cage, Op, OPS} from './types'
 import {rand, transpose} from './utils'
 
 const SHUFFLE_TIMES = 1e5 //number of times to shuffle rows and columns when making random board
-const MIN_CAGE_PROP = 0.3, MAX_CAGE_PROP = 0.45 //number of cages / number of cells
-const MIN_CAGE_SIZE = 1, MAX_CAGE_SIZE_PROP = 1.5 //MEAN_CAGE_SIZE_PROP = 0.7
+const MIN_CAGE_SIZE = 1, MAX_CAGE_SIZE = 4.7 //decrease probability of large cages
+const MAX_UNALLOCATED_CAGE_SIZE = 3 //maximum allowed cage size of unallocated regions (lower to decrease number of large cages)
 
 type Board = number[][] //indexed by row, then col
 
@@ -31,26 +31,8 @@ export function makeBoard(max: number, shuffleTimes = SHUFFLE_TIMES): Board {
 	return board
 }
 
-// const poisson = (mu: number) => { //picks a random number according to a Poisson(mu) distribution
-// 	const cumProb = Math.random() * Math.exp(mu)
-// 	let prob = 0
-// 	let mu_k = 1
-// 	let kFac = 1
-// 	for (let k = 0; ; k++) {
-// 		prob += mu_k / kFac
-// 		if (prob > cumProb) return k
-// 		mu_k *= mu
-// 		kFac *= k + 1
-// 	}
-// }
-const makeCageCount = (max: number) =>
-	Math.round(
-		(Math.random() * (MAX_CAGE_PROP - MIN_CAGE_PROP) + MIN_CAGE_PROP) *
-		max ** 2
-	)
-const maxCageSize = (max: number) => MAX_CAGE_SIZE_PROP * Math.sqrt(max)
-const makeCageSize = (max: number) =>
-	MIN_CAGE_SIZE + Math.round(Math.random() * (maxCageSize(max) - MIN_CAGE_SIZE))
+const makeCageSize = () =>
+	MIN_CAGE_SIZE + Math.round(Math.random() * (MAX_CAGE_SIZE - MIN_CAGE_SIZE))
 type BoxId = string
 const boxId = (box: Box): BoxId => box.join(' ')
 const fromBoxId = (id: BoxId): Box => id.split(' ').map(Number) as Box
@@ -68,7 +50,6 @@ function insertIntoSorted<T>(arr: T[], item: T, comp: (a: T, b: T) => number) {
 
 export function makeCages(board: Board): Cage[] {
 	const max = board.length
-	const cageCount = makeCageCount(max)
 	const cagedCells = new Set<BoxId>()
 	const neighborsOf = ([row, col]: Box) =>
 		DIRS
@@ -109,11 +90,11 @@ export function makeCages(board: Board): Cage[] {
 			boxes: cage
 		})
 	}
-	const maxCage = maxCageSize(max)
-	while (unallocatedRegions.length && (unallocatedRegions.length + cages.length < cageCount || unallocatedRegions.slice(-1)[0].length > maxCage)) {
+	//Generate cages while there are unallocated regions of size > maxCage
+	while (unallocatedRegions.length && unallocatedRegions.slice(-1)[0].length > MAX_UNALLOCATED_CAGE_SIZE) {
 		const region = unallocatedRegions.pop()! //region from which to carve out a cage
 		const regionRemaining = new Set(region.map(boxId))
-		const cageSize = makeCageSize(max)
+		const cageSize = makeCageSize()
 		const cageStart = chooseRand(region)
 		const cage: Box[] = []
 		function addToCage(box: Box) {

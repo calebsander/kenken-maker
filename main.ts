@@ -9,10 +9,15 @@ import {Cage, puzzleType, solutionType} from './types'
 const SOLUTION_FILE = 'solution.sbv'
 const CAGINGS_DIR = 'cagings'
 
-const {argv} = process
-if (argv.length !== 3) throw new Error('Usage: ./main.js boardSize')
+function usageError() {
+	throw new Error('Usage: ./main.js boardSize')
+}
 
+const {argv} = process
+if (argv.length !== 3) usageError()
 const size = Number(argv[2])
+if (isNaN(size)) usageError()
+
 const board = makeBoard(size)
 sb.writeValue({
 	type: solutionType,

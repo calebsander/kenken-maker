@@ -2,8 +2,7 @@ import {Box, Cage, Op, OPS} from './types'
 import {rand, transpose} from './utils'
 
 const SHUFFLE_TIMES = 1e5 //number of times to shuffle rows and columns when making random board
-const MIN_CAGE_SIZE = 1, MAX_CAGE_SIZE = 4.7 //decrease probability of large cages
-const MAX_UNALLOCATED_CAGE_SIZE = 3 //maximum allowed cage size of unallocated regions (lower to decrease number of large cages)
+const MIN_CAGE_SIZE = 1.05, MAX_CAGE_SIZE = 4.7 //decreased probability of size-1 and size-5 cages
 
 type Board = number[][] //indexed by row, then col
 
@@ -32,7 +31,7 @@ export function makeBoard(max: number, shuffleTimes = SHUFFLE_TIMES): Board {
 }
 
 const makeCageSize = () =>
-	MIN_CAGE_SIZE + Math.round(Math.random() * (MAX_CAGE_SIZE - MIN_CAGE_SIZE))
+	Math.round(MIN_CAGE_SIZE + Math.random() * (MAX_CAGE_SIZE - MIN_CAGE_SIZE))
 type BoxId = string
 const boxId = (box: Box): BoxId => box.join(' ')
 const fromBoxId = (id: BoxId): Box => id.split(' ').map(Number) as Box
@@ -91,7 +90,7 @@ export function makeCages(board: Board): Cage[] {
 		})
 	}
 	//Generate cages while there are unallocated regions of size > maxCage
-	while (unallocatedRegions.length && unallocatedRegions.slice(-1)[0].length > MAX_UNALLOCATED_CAGE_SIZE) {
+	while (unallocatedRegions.length) {
 		const region = unallocatedRegions.pop()! //region from which to carve out a cage
 		const regionRemaining = new Set(region.map(boxId))
 		const cageSize = makeCageSize()

@@ -29,7 +29,7 @@ sb.writeValue({
 	promisify(fs.mkdir)(CAGINGS_DIR).catch(_ => {})
 		.then(makeCaging)
 })
-const stepsCount = new Map<number, number>() //key 0 for unsolvable
+const stepsCount: number[] = [] //map of difficulties to count of cagins; key 0 for unsolvable
 function makeCaging() {
 	let cages: Cage[], steps: number
 	let solved = false
@@ -37,22 +37,38 @@ function makeCaging() {
 		cages = makeCages(board)
 		const solvingBoard = makeSolvingBoard(size, cages)
 		steps = solvingBoard.solve()
-		if (solvingBoard.isSolved()) solved = true
-		else stepsCount.set(0, (stepsCount.get(0) || 0) + 1)
+		if (solvingBoard.noPossibilities()) { //should never happen
+			console.log('Failed solve\n' + solvingBoard.toString())
+		}
+		else if (solvingBoard.isSolved()) solved = true
+		else stepsCount[0] = (stepsCount[0] || 0) + 1
 	}
-	stepsCount.set(steps!, (stepsCount.get(steps) || 0) + 1)
-	console.log(stepsCount)
+	stepsCount[steps!] = (stepsCount[steps] || 0) + 1
+	logPuzzleCounts()
 	const cagingDir = CAGINGS_DIR + '/' + String(steps)
 	promisify(fs.mkdir)(cagingDir).catch(_ => {})
 		.then(() => new Promise<void>((resolve, reject) =>
 			sb.writeValue({
 				type: puzzleType,
 				value: {max: size, cages},
-				outStream: fs.createWriteStream(cagingDir + '/' + String(stepsCount.get(steps)) + '.sbv')
+				outStream: fs.createWriteStream(cagingDir + '/' + String(stepsCount[steps]) + '.sbv')
 			}, err => {
 				if (err) reject(err)
 				else resolve()
 			})
 		))
 		.then(makeCaging)
+}
+function logPuzzleCounts() {
+	const failed = stepsCount[0] || 0
+	const succeeded = stepsCount.reduce((a, b) => a + b, 0) - failed
+	console.log(
+		'Successes:',
+		String(succeeded / (failed + succeeded) * 100) + '%;',
+		'Counts:',
+		stepsCount
+			.map((count, steps) => String(steps) + ': ' + String(count))
+			.filter(x => x) //take out all steps with no count
+			.join(', ')
+	)
 }

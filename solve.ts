@@ -321,6 +321,9 @@ class SolvingBoard {
 	isSolved(): boolean {
 		return this._rows.every(row => row.boxes.every(box => box.possibilities.size === 1))
 	}
+	noPossibilities(): boolean {
+		return this._rows.some(row => row.boxes.some(box => !box.possibilities.size))
+	}
 }
 
 const leftPad = (str: string, len: number) => ' '.repeat(Math.max(len - str.length, 0)) + str

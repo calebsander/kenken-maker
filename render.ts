@@ -45,13 +45,13 @@ Promise.all([readPuzzle, readSolutions])
 		out.push('<head><style>')
 			out.push(
 				'table{position:relative;top:10px;border-collapse:collapse}',
-				'td{position:relative;width:50px;height:50px;border:1px dotted black;font-family:monospace}',
+				'td{position:relative;width:50px;height:50px;border:1.5px dashed black;font-family:Arial,Helvetica,sans-serif}',
 				'td.top{border-top:2px solid black}',
 				'td.left{border-left:2px solid black}',
 				'td.right{border-right:2px solid black}',
 				'td.bottom{border-bottom:2px solid black}',
 				'span.op{position:absolute;top:0;font-size:12px}',
-				'span.value{display:none;position:absolute;top:12px;left:16px;font-size:24px}',
+				'span.value{display:none;position:absolute;top:10px;left:16px;font-size:28px}',
 				'input:checked~table span.value{display:block}'
 			)
 		out.push('</style></head>')

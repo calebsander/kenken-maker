@@ -7,7 +7,7 @@ export interface Cage {
 	val: number
 	boxes: Box[]
 }
-interface Puzzle {
+export interface Puzzle {
 	max: number
 	cages: Cage[]
 }

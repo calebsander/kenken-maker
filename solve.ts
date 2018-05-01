@@ -7,49 +7,67 @@ const MAX_GROUP_SIZE = 4 //maximum number of cells to check for being an isolate
 
 type Solver = (board: SolvingBoard) => void
 
-//val is ensured to always be at least MIN_NUMBER
 function arithmeticPossibilities(op: Op, val: number, max: number, boxes: number): number[][] {
 	if (!boxes) throw new Error('No boxes')
+	if (boxes === 1) return (MIN_NUMBER <= val && val <= max) ? [[val]] : [] //should catch =
 	const possibilities: number[][] = []
-	if (op === '=') {
-		if (boxes !== 1) throw new Error('Unexpected =')
-		return val <= max ? [[val]] : []
-	}
-	if (boxes === 1) return (MIN_NUMBER <= val && val <= max) ? [[val]] : []
 	switch (op) {
-		case '+': {
+		case '+':
 			for (let chosen = MIN_NUMBER; chosen <= max && chosen < val; chosen++) {
-				for (const others of arithmeticPossibilities(op, val - chosen, max, boxes - 1)) {
-					possibilities.push([chosen, ...others])
-				}
+				possibilities.push(
+					...cachedPosibilities(op, val - chosen, max, boxes - 1)
+					.map(others => [chosen, ...others])
+				)
 			}
 			break
-		}
-		case '*': {
+		case '*':
 			for (let chosen = MIN_NUMBER; chosen <= max && chosen <= val; chosen++) {
 				const otherProduct = val / chosen
 				if (otherProduct !== (otherProduct | 0)) continue
-				for (const others of arithmeticPossibilities(op, otherProduct, max, boxes - 1)) {
-					possibilities.push([chosen, ...others])
-				}
+				possibilities.push(
+					...cachedPosibilities(op, otherProduct, max, boxes - 1)
+					.map(others => [chosen, ...others])
+				)
 			}
 			break
-		}
-		case '-': {
+		case '-':
 			//Two cases in A - B - C: either this box contains A or it contains either B or C
 			//A:
 			for (let chosen = val + 1; chosen <= max; chosen++) {
-				for (const others of arithmeticPossibilities('+', chosen - val, max, boxes - 1)) {
-					possibilities.push([chosen, ...others])
-				}
+				possibilities.push(
+					...cachedPosibilities('+', chosen - val, max, boxes - 1)
+					.map(others => [chosen, ...others])
+				)
 			}
 			//B or C:
 			for (let chosen = MIN_NUMBER; chosen <= max; chosen++) {
-				for (const others of arithmeticPossibilities('-', val + chosen, max, boxes - 1)) {
-					possibilities.push([chosen, ...others])
-				}
+				possibilities.push(
+					...cachedPosibilities('-', val + chosen, max, boxes - 1)
+					.map(others => [chosen, ...others])
+				)
 			}
-		}
+			break
+		case '/':
+			//Two cases in A / B / C: either this box contains A or it contains either B or C
+			//A:
+			for (let chosen = val; chosen <= max; chosen++) {
+				const otherProduct = chosen / val
+				if (otherProduct !== (otherProduct | 0)) continue
+				possibilities.push(
+					...cachedPosibilities('*', otherProduct, max, boxes - 1)
+					.map(others => [chosen, ...others])
+				)
+			}
+			//B or C:
+			for (let chosen = MIN_NUMBER; chosen <= max; chosen++) {
+				possibilities.push(
+					...cachedPosibilities('/', val * chosen, max, boxes - 1)
+					.map(others => [chosen, ...others])
+				)
+			}
+			break
+		default:
+			throw new Error('Unknown op: ' + op)
 	}
 	return possibilities
 }

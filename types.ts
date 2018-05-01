@@ -1,6 +1,6 @@
 import * as sb from 'structure-bytes'
 
-export type Op = '=' | '+' | '-' | '*'
+export type Op = '=' | '+' | '-' | '*' | '/'
 export type Box = [number, number] //[row, column]
 export interface Cage {
 	op: Op
@@ -13,7 +13,7 @@ export interface Puzzle {
 }
 type Solution = number[] //2-D array compressed into 1-D
 
-export const OPS: Op[] = ['=', '+', '-', '*']
+export const OPS: Op[] = ['=', '+', '-', '*', '/']
 
 const operationType = new sb.EnumType<Op>({
 	type: new sb.CharType as sb.Type<Op>,

@@ -1,9 +1,14 @@
 #!/usr/bin/env node
 import * as fs from 'fs'
 import * as sb from 'structure-bytes'
-import {Cage, Puzzle, puzzleType, solutionType} from './types'
+import {Cage, Op, Puzzle, puzzleType, solutionType} from './types'
 
 const PUZZLE_FILE = 'puzzle.html'
+//Symbols to display instead of op strings
+const DISPLAY_OPS = new Map<Op, string>()
+	.set('=', '')
+	.set('*', '×')
+	.set('/', '÷')
 
 const {argv} = process
 if (argv.length !== 3) throw new Error('Usage: ./render.js path/to/cagings.sbv')
@@ -39,7 +44,9 @@ Promise.all([readPuzzle, readSolutions])
 				const [topLeftR, topLeftC] = topLeftBox
 				if (r < topLeftR || (r === topLeftR && c < topLeftC)) topLeftBox = [r, c]
 			}
-			boxOps.set(topLeftBox.join(' '), val + (op === '=' ? '' : op))
+			let displayOp = DISPLAY_OPS.get(op)
+			if (displayOp === undefined) displayOp = op
+			boxOps.set(topLeftBox.join(' '), val + displayOp)
 		}
 		const out: string[] = []
 		out.push('<head><style>')

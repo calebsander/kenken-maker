@@ -1,8 +1,10 @@
-import {Box, Cage, Op, OPS} from './types'
+import {Box, Cage, Op} from './types'
 import {rand, transpose} from './utils'
 
 const SHUFFLE_TIMES = 1e5 //number of times to shuffle rows and columns when making random board
 const MIN_CAGE_SIZE = 1.05, MAX_CAGE_SIZE = 4.7 //decreased probability of size-1 and size-5 cages
+const DIV_PROB = 0.5, //probability of picking '/' for cage op if possible
+    MINUS_PROB = 0.5  //probability of picking '-' for cage op if possible and '/' not chosen
 
 type Board = number[][] //indexed by row, then col
 
@@ -38,8 +40,8 @@ const fromBoxId = (id: BoxId): Box => id.split(' ').map(Number) as Box
 const chooseRand = <T>(arr: T[]) => arr[rand(arr.length)]
 const extractRand = <T>(arr: T[]) => arr.splice(rand(arr.length), 1)[0]
 const DIRS: Box[] = [[1, 0], [-1, 0], [0, 1], [0, -1]]
-const numericOps = OPS.filter(op => op !== '=')
-const opsWithoutMinus = numericOps.filter(op => op !== '-')
+//Operations that can be used for any cage of size > 1 (- and / are not always possible)
+const alwaysPossibleOps: Op[] = ['+', '*']
 function insertIntoSorted<T>(arr: T[], item: T, comp: (a: T, b: T) => number) {
 	const {length} = arr
 	let i
@@ -61,31 +63,42 @@ export function makeCages(board: Board): Cage[] {
 	const unallocatedRegions: Box[][] = [fullGrid] //sorted by size
 	const cages: Cage[] = []
 	function addCage(cage: Box[]) {
+		const numbers = cage.map(([row, col]) => board[row][col])
 		let op: Op, val: number
 		if (cage.length === 1) {
 			op = '='
-			const [[row, col]] = cage
-			val = board[row][col]
+			;[val] = numbers
 		}
 		else {
-			const numbers = cage.map(([row, col]) => board[row][col])
 			const max = Math.max(...numbers)
-			const maxMinus = max - (numbers.reduce((a, b) => a + b) - max)
-			op = chooseRand(maxMinus > 0 ? numericOps : opsWithoutMinus)
+			const sum = numbers.reduce((a, b) => a + b),
+			  product = numbers.reduce((a, b) => a * b)
+			const maxMinus = max - (sum - max),
+			        maxDiv = max / (product / max)
+			op =
+				(maxDiv === (maxDiv | 0) && Math.random() < DIV_PROB) ? '/' : //try to use div if possible, since this is rarer
+				(maxMinus > 0 && Math.random() < MINUS_PROB) ? '-' :
+				chooseRand(alwaysPossibleOps)
 			switch (op) {
 				case '+':
-					val = numbers.reduce((a, b) => a + b)
+					val = sum
 					break
 				case '*':
-					val = numbers.reduce((a, b) => a * b)
+					val = product
 					break
 				case '-':
 					val = maxMinus
+					break
+				case '/':
+					val = maxDiv
+					break
+				default:
+					throw new Error('Unknown op: ' + op)
 			}
 		}
 		cages.push({
 			op,
-			val: val!,
+			val,
 			boxes: cage
 		})
 	}

@@ -26,7 +26,18 @@ sb.writeValue({
 }, err => {
 	if (err) throw err
 	console.log('Saved solution')
-	promisify(fs.mkdir)(CAGINGS_DIR).catch(_ => {})
+	promisify(fs.readdir)(CAGINGS_DIR)
+		.then(difficulties => Promise.all(difficulties.map(difficulty => {
+			const difficultyDir = CAGINGS_DIR + '/' + difficulty
+			return promisify(fs.readdir)(difficultyDir)
+				.then(files => Promise.all(files.map(file =>
+					promisify(fs.unlink)(difficultyDir + '/' + file)
+				)))
+				.then(_ => promisify(fs.rmdir)(difficultyDir))
+		})))
+		.then(_ => promisify(fs.rmdir)(CAGINGS_DIR))
+		.catch(_ => {})
+		.then(_ => promisify(fs.mkdir)(CAGINGS_DIR))
 		.then(makeCaging)
 })
 const stepsCount: number[] = [] //map of difficulties to count of cagins; key 0 for unsolvable

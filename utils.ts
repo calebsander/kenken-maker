@@ -1,19 +1,11 @@
-export function count<A>(iter: Iterable<A>): number {
-	let items = 0
-	for (const _ of iter) items++
-	return items
-}
-const swap = <T>(arr: T[], i: number, j: number) =>
-	[arr[i], arr[j]] = [arr[j], arr[i]]
-export function *permute<T>(arr: T[], stopIndex = arr.length, startIndex = 0): IterableIterator<T[]> {
-	if (startIndex === stopIndex) {
-		yield arr
+export function* choose<T>(items: T[], k: number, start = 0, output = new Array<T>(k)): IterableIterator<T[]> {
+	if (!k) {
+		yield output
 		return
 	}
-	for (let swapIndex = startIndex; swapIndex < arr.length; swapIndex++) {
-		swap(arr, startIndex, swapIndex)
-		yield* permute(arr, stopIndex, startIndex + 1)
-		swap(arr, startIndex, swapIndex)
+	for (let chosen = start; chosen <= items.length - k; chosen++) {
+		output[output.length - k] = items[chosen]
+		yield *choose(items, k - 1, chosen + 1, output)
 	}
 }
 export const rand = (n: number): number => (Math.random() * n) | 0 //random number from 0 to n - 1

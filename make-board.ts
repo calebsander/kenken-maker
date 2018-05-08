@@ -23,7 +23,9 @@ export function makeBoard(max: number, shuffleTimes = SHUFFLE_TIMES): Board {
 	}
 	//Then alternately swap rows and columns
 	for (let _ = 0; _ < shuffleTimes; _++) {
-		const r1 = rand(max), r2 = rand(max)
+		const r1 = rand(max)
+		let r2 = rand(max - 1)
+		if (r2 >= r1) r2++ //r2 between 0 and max, but not equal to r1
 		const temp = board[r1]
 		board[r1] = board[r2]
 		board[r2] = temp

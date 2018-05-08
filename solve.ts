@@ -1,5 +1,5 @@
 import {Cage, Op} from './types'
-import {count, permute, times, transpose, zip} from './utils'
+import {choose, times, transpose, zip} from './utils'
 
 const MIN_NUMBER = 1
 const MAX_ADDITION_SIZE = 4 //maximum number of cells in a '+' or '-' box to consider; any more and the list of possibilities becomes enormous
@@ -129,14 +129,17 @@ const pickUniques: Solver = board => {
 const findIsolatedGroups: Solver = board => {
 	for (const {boxes} of board.rows) {
 		for (let groupSize = 1; groupSize <= MAX_GROUP_SIZE && groupSize < boxes.length; groupSize++) {
-			for (const rowPermutation of permute(boxes, groupSize)) {
+			for (const group of choose(boxes, groupSize)) {
 				const possibilitiesUnion = new Set<number>()
-				for (let i = 0; i < groupSize; i++) { //union all possibilities of first groupSize cells
-					for (const possibility of rowPermutation[i].possibilities) possibilitiesUnion.add(possibility)
+				const groupSet = new Set<SolvingBox>()
+				for (const box of group) { //union all possibilities of boxes
+					for (const possibility of box.possibilities) possibilitiesUnion.add(possibility)
+					groupSet.add(box)
 				}
 				if (possibilitiesUnion.size > groupSize) continue //not an isolated group
-				for (let i = groupSize; i < boxes.length; i++) { //remove possibilites from other cells
-					for (const possibility of possibilitiesUnion) rowPermutation[i].excludePossibility(possibility)
+				for (const box of boxes) { //remove possibilites from other boxes
+					if (groupSet.has(box)) continue
+					for (const possibility of possibilitiesUnion) box.excludePossibility(possibility)
 				}
 			}
 		}
@@ -158,11 +161,11 @@ const crossRowEliminate: Solver = board => {
 				rowCrossRows.push({row, crossRows})
 			}
 			for (let groupSize = 2; groupSize <= MAX_GROUP_SIZE && groupSize < rowCrossRows.length; groupSize++) {
-				for (const rowPermutation of permute(rowCrossRows, groupSize)) {
+				for (const rowSet of choose(rowCrossRows, groupSize)) {
 					const rows = new Set<SolvingRow>()
 					const crossRowsUnion = new Set<SolvingRow>()
-					for (let i = 0; i < groupSize; i++) { //union all cross rows of first groupSize rows
-						const {row, crossRows} = rowPermutation[i]
+					for (const rowCrossRow of rowSet) { //union all cross rows of first groupSize rows
+						const {row, crossRows} = rowCrossRow
 						rows.add(row)
 						for (const crossRow of crossRows) crossRowsUnion.add(crossRow)
 					}
@@ -297,7 +300,7 @@ class SolvingBoard {
 	}
 	equals(other: SolvingBoard): boolean { //assumes other's possibilities are a proper subset of this's possibilities
 		for (const [box, otherBox] of zip(this.boxes(), other.boxes())) {
-			if (count(otherBox.possibilities) < count(box.possibilities)) return false
+			if (otherBox.possibilities.size < box.possibilities.size) return false
 		}
 		return true
 	}

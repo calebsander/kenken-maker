@@ -48,97 +48,101 @@ function insertIntoSorted<T>(arr: T[], item: T, comp: (a: T, b: T) => number) {
 	for (i = 0; i < length && comp(item, arr[i]) > 0; i++); //while item > arr[i]
 	arr.splice(i, 0, item)
 }
+const sortByLength = <T>(region1: T[], region2: T[]) => region1.length - region2.length
+function addCage(board: Board, cages: Cage[], boxes: Box[]) {
+	const numbers = boxes.map(([row, col]) => board[row][col])
+	let op: Op, val: number
+	if (boxes.length === 1) {
+		op = '='
+		;[val] = numbers
+	}
+	else {
+		const max = Math.max(...numbers)
+		const sum = numbers.reduce((a, b) => a + b),
+		  product = numbers.reduce((a, b) => a * b)
+		const maxMinus = max - (sum - max),
+		        maxDiv = max / (product / max)
+		op =
+			(maxDiv === (maxDiv | 0) && Math.random() < DIV_PROB) ? '/' : //try to use div if possible, since this is rarer
+			(maxMinus > 0 && Math.random() < MINUS_PROB) ? '-' :
+			chooseRand(alwaysPossibleOps)
+		switch (op) {
+			case '+':
+				val = sum
+				break
+			case '*':
+				val = product
+				break
+			case '-':
+				val = maxMinus
+				break
+			case '/':
+				val = maxDiv
+				break
+			default:
+				throw new Error('Unknown op: ' + op)
+		}
+	}
+	cages.push({op, val, boxes})
+}
 
 export function makeCages(board: Board): Cage[] {
 	const max = board.length
-	const cagedCells = new Set<BoxId>()
-	const neighborsOf = ([row, col]: Box) =>
+	const cagedBoxes = new Set<BoxId>() //boxes in any cage
+	const neighborsOf = ([r, c]: Box) =>
 		DIRS
-			.map(([dr, dc]) => [row + dr, col + dc] as Box)
-			.filter(neighbor => neighbor.every(x => 0 <= x && x < max) && !cagedCells.has(boxId(neighbor)))
+			.map(([dr, dc]) => [r + dr, c + dc] as Box)
+			.filter(neighbor => neighbor.every(x => 0 <= x && x < max) && !cagedBoxes.has(boxId(neighbor)))
 	const fullGrid: Box[] = []
 	for (let row = 0; row < max; row++) {
 		for (let col = 0; col < max; col++) fullGrid.push([row, col])
 	}
 	const unallocatedRegions: Box[][] = [fullGrid] //sorted by size
 	const cages: Cage[] = []
-	function addCage(cage: Box[]) {
-		const numbers = cage.map(([row, col]) => board[row][col])
-		let op: Op, val: number
-		if (cage.length === 1) {
-			op = '='
-			;[val] = numbers
-		}
-		else {
-			const max = Math.max(...numbers)
-			const sum = numbers.reduce((a, b) => a + b),
-			  product = numbers.reduce((a, b) => a * b)
-			const maxMinus = max - (sum - max),
-			        maxDiv = max / (product / max)
-			op =
-				(maxDiv === (maxDiv | 0) && Math.random() < DIV_PROB) ? '/' : //try to use div if possible, since this is rarer
-				(maxMinus > 0 && Math.random() < MINUS_PROB) ? '-' :
-				chooseRand(alwaysPossibleOps)
-			switch (op) {
-				case '+':
-					val = sum
-					break
-				case '*':
-					val = product
-					break
-				case '-':
-					val = maxMinus
-					break
-				case '/':
-					val = maxDiv
-					break
-				default:
-					throw new Error('Unknown op: ' + op)
-			}
-		}
-		cages.push({
-			op,
-			val,
-			boxes: cage
-		})
-	}
 	//Generate cages while there are unallocated regions of size > maxCage
 	while (unallocatedRegions.length) {
-		const region = unallocatedRegions.pop()! //region from which to carve out a cage
-		const regionRemaining = new Set(region.map(boxId))
+		const region = unallocatedRegions.pop()! //choose largest region from which to carve out a cage
+		const regionRemaining = new Set(region.map(boxId)) //boxes in region which have not been put into cage
 		const cageSize = makeCageSize()
 		const cageStart = chooseRand(region)
+		//Execute partial DFS from cageStart until cage has reached cageSize or no more neighbors exist
 		const cage: Box[] = []
-		function addToCage(box: Box) {
-			cage.push(box)
-			cagedCells.add(boxId(box))
-			regionRemaining.delete(boxId(box))
-		}
-		addToCage(cageStart)
-		const neighbors: Box[] = neighborsOf(cageStart)
+		const neighbors = [cageStart] //possible adjacent boxes to add to cage
+		const markedNeighbors = new Set([boxId(cageStart)]) //cage ∪ neighbors
 		while (cage.length < cageSize && neighbors.length) {
-			const neighbor = extractRand(neighbors)
-			if (!regionRemaining.has(boxId(neighbor))) continue
-			addToCage(neighbor)
-			neighbors.push(...neighborsOf(neighbor))
-		}
-		addCage(cage)
-		while (regionRemaining.size) {
-			const [subRegionStart] = regionRemaining
-			regionRemaining.delete(subRegionStart)
-			const unallocatedRegion = [fromBoxId(subRegionStart)]
-			const neighbors = neighborsOf(fromBoxId(subRegionStart))
-			while (neighbors.length) {
-				const nextNeighbor = neighbors.pop()!
-				const nextId = boxId(nextNeighbor)
-				if (!regionRemaining.has(nextId)) continue
-				regionRemaining.delete(nextId)
-				unallocatedRegion.push(nextNeighbor)
-				neighbors.push(...neighborsOf(nextNeighbor))
+			const cageBox = extractRand(neighbors) //new box selected to add to cage
+			const cageBoxId = boxId(cageBox)
+			cage.push(cageBox)
+			cagedBoxes.add(cageBoxId)
+			regionRemaining.delete(cageBoxId)
+			for (const neighbor of neighborsOf(cageBox)) {
+				const neighborId = boxId(neighbor)
+				if (!markedNeighbors.has(neighborId)) {
+					neighbors.push(neighbor)
+					markedNeighbors.add(neighborId)
+				}
 			}
-			insertIntoSorted(unallocatedRegions, unallocatedRegion, (region1, region2) => region1.length - region2.length)
+		}
+		addCage(board, cages, cage)
+		while (regionRemaining.size) {
+			const [regionStart] = regionRemaining
+			//Execute DFS from regionStart, adding reached vertices to region
+			const toExplore = [fromBoxId(regionStart)]
+			regionRemaining.delete(regionStart)
+			const region: Box[] = []
+			while (toExplore.length) {
+				const regionBox = toExplore.pop()!
+				region.push(regionBox)
+				for (const neighbor of neighborsOf(regionBox)) {
+					const neighborId = boxId(neighbor)
+					if (regionRemaining.has(neighborId)) {
+						toExplore.push(neighbor)
+						regionRemaining.delete(neighborId)
+					}
+				}
+			}
+			insertIntoSorted(unallocatedRegions, region, sortByLength)
 		}
 	}
-	unallocatedRegions.forEach(addCage)
 	return cages
 }

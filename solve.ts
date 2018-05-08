@@ -314,12 +314,9 @@ class SolvingBoard {
 		const cellWidth = (possibilityChars + 1) * possibilitiesPerRow + 1
 		const borderRow = '+' + new Array<string>(max).fill('-'.repeat(cellWidth)).join('+') + '+'
 		const rowsStrings = [borderRow]
-		//Assume first half of rows are rows and rest are columns
-		for (let r = 0; r < max; r++) {
-			const row = this.rows[r].boxes
+		for (const row of this._rows) {
 			const rowStrings: string[] = new Array<string>(1 + possibilityRows).fill('|')
-			for (let c = 0; c < max; c++) {
-				const cell = row[c]
+			for (const cell of row.boxes) {
 				rowStrings[0] += ' ' + rightPad(boxOps.get(cell)!, cellWidth - 1) + '|'
 				const possibilities = new Set(cell.possibilities)
 				for (let i = 0; i < possibilityRows; i++) {

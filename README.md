@@ -16,7 +16,7 @@ For larger grid sizes, `main.js` may need to be run for at least about 20 minute
 The shared solution to all these puzzles is stored in `solution.sbv`, and the different cagings are stored in the `cagings` folder, grouped by difficulty.
 For example, `cagings/5/1.sbv` is the first puzzle generated with difficulty 5, `cagings/5/2.sbv` is the second puzzle generated with difficulty 5, and so on.
 Running `main.js` will look something like this:
-````bash
+````
 $ ./main.js 9 #generate 9x9 puzzles
 Saved solution
 Successes: 33.33333333333333%; Counts: 0: 2, 5: 1
@@ -144,3 +144,5 @@ This metric is computed by applying each solver independently to the previous gr
 The number of steps required to fill in the grid is then the difficulty metric.
 This is probably not the most accurate metric of what makes a puzzle difficult to a human, but I just wanted a general sense of their relative difficulty so I could know which puzzles to choose among.
 Among other things, it doesn't consider the breadth of the inference graph or the relative difficulty of steps made by the different solvers.
+
+Caleb Sander, 2018

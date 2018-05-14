@@ -127,22 +127,35 @@ const pickUniques: Solver = board => {
 	}
 }
 const findIsolatedGroups: Solver = board => {
+	const toExclude = new Map<SolvingBox, Set<number>>()
 	for (const {boxes} of board.rows) {
 		for (let groupSize = 1; groupSize <= MAX_GROUP_SIZE && groupSize < boxes.length; groupSize++) {
 			for (const group of choose(boxes, groupSize)) {
+				const groupSet = new Set(group)
 				const possibilitiesUnion = new Set<number>()
-				const groupSet = new Set<SolvingBox>()
 				for (const box of group) { //union all possibilities of boxes
 					for (const possibility of box.possibilities) possibilitiesUnion.add(possibility)
-					groupSet.add(box)
 				}
 				if (possibilitiesUnion.size > groupSize) continue //not an isolated group
 				for (const box of boxes) { //remove possibilites from other boxes
 					if (groupSet.has(box)) continue
-					for (const possibility of possibilitiesUnion) box.excludePossibility(possibility)
+					let toExcludeBox = toExclude.get(box)
+					if (!toExcludeBox) {
+						toExcludeBox = new Set
+						toExclude.set(box, toExcludeBox)
+					}
+					for (const possibility of possibilitiesUnion) toExcludeBox.add(possibility)
 				}
 			}
 		}
+	}
+	/**
+	 * Exclude possibilities at the end so they cannot be used within the same solve step.
+	 * Otherwise, one isolated group could exclude possibilities, forming a new isolated group
+	 * that could exclude other possibilities in the same step.
+	 */
+	for (const [box, possibilities] of toExclude) {
+		for (const possibility of possibilities) box.excludePossibility(possibility)
 	}
 }
 interface RowAndCrossRows {
@@ -151,13 +164,15 @@ interface RowAndCrossRows {
 }
 const crossRowEliminate: Solver = board => {
 	for (let value = MIN_NUMBER; value <= board.max; value++) {
+		const boxesToExclude = new Set<SolvingBox>()
 		for (const direction of board.directionRows) {
+			//For each row, find all cells that could have the value
+			//and store the crossing rows containing those cells
 			const rowCrossRows: RowAndCrossRows[] = []
 			for (const row of direction) {
-				const crossRows: SolvingRow[] = []
-				for (const box of row.boxes) {
-					if (box.possibilities.has(value)) crossRows.push(box.getOtherRow(row))
-				}
+				const crossRows = row.boxes
+					.filter(box => box.possibilities.has(value))
+					.map(box => box.getOtherRow(row))
 				rowCrossRows.push({row, crossRows})
 			}
 			for (let groupSize = 2; groupSize <= MAX_GROUP_SIZE && groupSize < rowCrossRows.length; groupSize++) {
@@ -172,12 +187,15 @@ const crossRowEliminate: Solver = board => {
 					if (crossRowsUnion.size > groupSize) continue //value is not in all of the cross rows
 					for (const crossRow of crossRowsUnion) { //remove possibilities from cross rows
 						for (const box of crossRow.boxes) {
-							if (!rows.has(box.getOtherRow(crossRow))) box.excludePossibility(value)
+							if (rows.has(box.getOtherRow(crossRow))) continue //skip boxes in original rows
+							boxesToExclude.add(box)
 						}
 					}
 				}
 			}
 		}
+		//See findIsolatedGroup for an explanation of the delayed exclusions
+		for (const box of boxesToExclude) box.excludePossibility(value)
 	}
 }
 const solvers: Solver[] = [
@@ -187,13 +205,6 @@ const solvers: Solver[] = [
 	crossRowEliminate
 ]
 
-class Range implements Iterable<number> { //inclusive
-	constructor(private readonly min: number, private readonly max: number) {}
-
-	*[Symbol.iterator]() {
-		for (let value = this.min; value <= this.max; value++) yield value
-	}
-}
 class SolvingBox {
 	public readonly rows: Set<SolvingRow>
 
@@ -202,11 +213,9 @@ class SolvingBox {
 	}
 
 	restrictPossibilities(restriction: Set<number>) {
-		const newPossibilities = new Set<number>()
 		for (const possibility of this.possibilities) {
-			if (restriction.has(possibility)) newPossibilities.add(possibility)
+			if (!restriction.has(possibility)) this.excludePossibility(possibility)
 		}
-		this.possibilities = newPossibilities
 	}
 	excludePossibility(possibility: number) {
 		this.possibilities.delete(possibility)
@@ -228,7 +237,7 @@ class SolvingBox {
 }
 class SolvingRow { //or column
 	constructor(public readonly boxes: SolvingBox[]) {
-		for (const box of boxes) box.rows.add(this)
+		for (const {rows} of boxes) rows.add(this)
 	}
 
 	get conflict(): boolean {
@@ -265,32 +274,29 @@ class SolvingBoard {
 	}
 	solve(): number {
 		let rounds = 0
-		let newBoard: SolvingBoard
 		while (true) {
-			newBoard = this.clone
+			const newBoard = this.clone
 			for (const solver of solvers) { //solve independent with each solver, starting from current board
 				const solverBoard = this.clone
 				solver(solverBoard)
 				for (const [box, solvedBox] of zip(newBoard.boxes(), solverBoard.boxes())) {
-					box.restrictPossibilities(new Set(solvedBox.possibilities)) //further restrict newBoard's possibilities from each solver's choices
+					box.restrictPossibilities(solvedBox.possibilities) //further restrict newBoard's possibilities from each solver's choices
 				}
 			}
 			if (this.equals(newBoard)) break
 			for (const [box, newBox] of zip(this.boxes(), newBoard.boxes())) {
-				box.restrictPossibilities(new Set(newBox.possibilities))
+				box.restrictPossibilities(newBox.possibilities)
 			}
 			rounds++
 		}
 		return rounds
 	}
 	*boxes(): Iterable<SolvingBox> {
-		for (const row of this.rows) {
-			yield* row.boxes
-		}
+		for (const {boxes} of this._rows) yield* boxes
 	}
 	get clone(): SolvingBoard {
 		const newBoxes = new Map<SolvingBox, SolvingBox>()
-		for (const box of this.boxes()) newBoxes.set(box, new SolvingBox(box.possibilities))
+		for (const box of this.boxes()) newBoxes.set(box, new SolvingBox(new Set(box.possibilities)))
 		const getNewBoxes = (boxes: SolvingBox[]) => boxes.map(box => newBoxes.get(box)!)
 		const getNewRow = ({boxes}: SolvingRow) => new SolvingRow(getNewBoxes(boxes))
 		const newRows = this._rows.map(getNewRow)
@@ -344,12 +350,12 @@ class SolvingBoard {
 	}
 }
 
-const leftPad = (str: string, len: number) => ' '.repeat(Math.max(len - str.length, 0)) + str
+const leftPad =  (str: string, len: number) => ' '.repeat(Math.max(len - str.length, 0)) + str
 const rightPad = (str: string, len: number) => str + ' '.repeat(Math.max(len - str.length, 0))
 
 export function makeSolvingBoard(max: number, cages: Cage[]): SolvingBoard {
 	const solvingBoxes = times(() => times(() =>
-		new SolvingBox(new Set(new Range(1, max))),
+		new SolvingBox(new Set(new Array(max).fill(0 as any).map((_, i) => i + 1))),
 	max), max)
 	const rows = solvingBoxes.map(row => new SolvingRow(row))
 	const columns = transpose(solvingBoxes).map(row => new SolvingRow(row))

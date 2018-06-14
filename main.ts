@@ -75,7 +75,7 @@ function logPuzzleCounts() {
 	const succeeded = stepsCount.reduce((a, b) => a + b, 0) - failed
 	console.log(
 		'Successes:',
-		String(succeeded / (failed + succeeded) * 100) + '%;',
+		(succeeded / (failed + succeeded) * 100).toFixed(2) + '%;',
 		'Counts:',
 		stepsCount
 			.map((count, steps) => String(steps) + ': ' + String(count))

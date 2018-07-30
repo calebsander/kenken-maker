@@ -4,6 +4,7 @@
 	"description": "Generates KenKen® puzzles",
 	"main": "main.js",
 	"scripts": {
+		"clean": "rm -rf cagings solution.sbv puzzle.html",
 		"build": "tsc",
 		"test": "echo \"Error: no test specified\" && exit 1"
 	},

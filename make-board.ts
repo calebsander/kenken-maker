@@ -26,9 +26,7 @@ export function makeBoard(max: number, shuffleTimes = SHUFFLE_TIMES): Board {
 		const r1 = rand(max)
 		let r2 = rand(max - 1)
 		if (r2 >= r1) r2++ //r2 between 0 and max, but not equal to r1
-		const temp = board[r1]
-		board[r1] = board[r2]
-		board[r2] = temp
+		[board[r1], board[r2]] = [board[r2], board[r1]]
 		board = transpose(board) //what were columns become rows and get swapped next time
 	}
 	return board
@@ -62,8 +60,8 @@ function addCage(board: Board, cages: Cage[], boxes: Box[]) {
 		const max = Math.max(...numbers)
 		const sum = numbers.reduce((a, b) => a + b),
 		  product = numbers.reduce((a, b) => a * b)
-		const maxMinus = max - (sum - max),
-		        maxDiv = max / (product / max)
+		const maxMinus = (max << 1) - sum,
+		        maxDiv = max ** 2 / product
 		op =
 			(maxDiv === (maxDiv | 0) && Math.random() < DIV_PROB) ? '/' : //try to use div if possible, since this is rarer
 			(maxMinus > 0 && Math.random() < MINUS_PROB) ? '-' :

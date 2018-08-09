@@ -97,7 +97,8 @@ The solving rules are as follows:
 
 - Arithmetic restriction: look at each cage and find all possible ways to fill in the boxes with numbers `1` to `n`.
 	Throw out all combinations that would lead to the same number being in any row or column.
-	For each box, restrict its possible values to the values it could take on in any valid combination of box values.
+	For each box, restrict its possible values to the values it could take on in any valid combination.
+	In addition, if every possible combination causes some row to have a box with some number `C`, `C` is excluded from the rest of that row.
 
 	For example, in a 6x6 puzzle, a cage with 3 boxes and `6*` as its target has the following possible combinations of values:
 	````
@@ -137,11 +138,12 @@ For example, it is often possible to find the sum of all the boxes in a row or c
 
 ## The difficulty metric
 
-Informally, the difficulty of a puzzle is measured by the number of sequential logical steps are required to solve it.
+Informally, the difficulty of a puzzle is measured by the number of sequential logical steps required to solve it.
 The idea is, for example, that if every square's value can be found by making at most 5 logical inferences, then this is probably an easier puzzle than if 10 inferences were required to find some square's value.
-If the set of partially filled-in grids is considered as a directed acyclic graph where edges represent single inferences, the difficulty metric is the minimum number of edges on a path from the empty grid to the filled grid.
+
+If the set of partially filled-in grids is considered as a directed acyclic graph where edges represent single inferences, the difficulty metric is the minimum number of edges on a path from the empty grid to the solved grid.
 This metric is computed by applying each solver independently to the previous grid, and then taking the intersection of the possibilities given by each of the solvers to compute the next grid.
-The number of steps required to fill in the grid is then the difficulty metric.
+The number of steps required to solve the grid is then the difficulty metric.
 This is probably not the most accurate metric of what makes a puzzle difficult to a human, but I just wanted a general sense of their relative difficulty so I could know which puzzles to choose among.
 Among other things, it doesn't consider the breadth of the inference graph or the relative difficulty of steps made by the different solvers.
 

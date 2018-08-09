@@ -5,6 +5,12 @@ const MIN_NUMBER = 1
 const MAX_ADDITION_SIZE = 4 //maximum number of cells in a '+' or '-' box to consider; any more and the list of possibilities becomes enormous
 const MAX_GROUP_SIZE = 4 //maximum number of cells to check for being an isolated group
 
+function allPossibilities(max: number) {
+	const possibilities = new Set<number>()
+	for (let i = 1; i <= max; i++) possibilities.add(i)
+	return possibilities
+}
+
 type Solver = (board: SolvingBoard) => void
 
 function arithmeticPossibilities(op: Op, val: number, max: number, boxes: number): number[][] {
@@ -85,24 +91,56 @@ function cachedPosibilities(op: Op, val: number, max: number, boxes: number): nu
 }
 
 const arithmeticSolver: Solver = board => {
-	for (const cage of board.cages) {
+	const {max, cages, rows} = board
+	for (const cage of cages) {
 		const {op, val, boxes} = cage
 		if ((op === '+' || op === '-') && boxes.length > MAX_ADDITION_SIZE) continue
+		const rowsMustHave = new Map<SolvingRow, Set<number>>()
+		for (const box of boxes) {
+			for (const row of box.rows) {
+				if (!rowsMustHave.has(row)) rowsMustHave.set(row, allPossibilities(max))
+			}
+		}
 		const originalBoxPossibilities = new Map(boxes.map(box => [box, box.possibilities] as [SolvingBox, Set<number>]))
 		const boxesPossibilities = boxes.map(_ => new Set<number>())
-		possibilityCheck: for (const possibilities of cachedPosibilities(op, val, board.max, boxes.length)) {
+		possibilityCheck: for (const possibilities of cachedPosibilities(op, val, max, boxes.length)) {
 			for (const [box, possibility] of zip(boxes, possibilities)) {
 				if (!originalBoxPossibilities.get(box)!.has(possibility)) continue possibilityCheck
 				box.value = possibility
 			}
-			if (board.rows.some(row => row.conflict)) continue
-			for (const [boxPossibilities, possibility] of zip(boxesPossibilities, possibilities)) {
-				boxPossibilities.add(possibility)
+			if (rows.some(row => row.conflict)) continue
+			const rowsHave = new Map<SolvingRow, Set<number>>()
+			for (let i = 0; i < boxes.length; i++) {
+				const possibility = possibilities[i]
+				boxesPossibilities[i].add(possibility)
+				for (const row of boxes[i].rows) {
+					let rowHas = rowsHave.get(row)
+					if (!rowHas) {
+						rowHas = new Set
+						rowsHave.set(row, rowHas)
+					}
+					rowHas.add(possibility)
+				}
+			}
+			for (const [row, mustHaves] of rowsMustHave) {
+				for (const mustHave of mustHaves) {
+					if (!rowsHave.get(row)!.has(mustHave)) {
+						if (mustHaves.delete(mustHave) && !mustHaves.size) {
+							rowsMustHave.delete(row)
+						}
+					}
+				}
 			}
 		}
 		for (const [box, boxPossibilities] of zip(boxes, boxesPossibilities)) {
 			box.possibilities = originalBoxPossibilities.get(box)!
 			box.restrictPossibilities(boxPossibilities)
+		}
+		for (const [row, mustHaves] of rowsMustHave) {
+			for (const box of row.boxes) {
+				if (originalBoxPossibilities.has(box)) continue //skip boxes in this cage
+				for (const mustHave of mustHaves) box.excludePossibility(mustHave)
+			}
 		}
 	}
 }
@@ -355,7 +393,7 @@ const rightPad = (str: string, len: number) => str + ' '.repeat(Math.max(len - s
 
 export function makeSolvingBoard(max: number, cages: Cage[]): SolvingBoard {
 	const solvingBoxes = times(() => times(() =>
-		new SolvingBox(new Set(new Array(max).fill(0 as any).map((_, i) => i + 1))),
+		new SolvingBox(allPossibilities(max)),
 	max), max)
 	const rows = solvingBoxes.map(row => new SolvingRow(row))
 	const columns = transpose(solvingBoxes).map(row => new SolvingRow(row))
